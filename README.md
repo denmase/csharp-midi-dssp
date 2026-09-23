@@ -111,10 +111,21 @@ named by `MIDI_DDSP_WEIGHTS`, and are skipped if neither exists. FluidSynth
 tests need libfluidsynth and `TimGM6mb.sf2` (`timgm6mb-soundfont`, or set
 `MIDI_DDSP_SOUNDFONT`), and are skipped otherwise.
 
-CI (GitHub Actions) builds, runs every test with the weights and FluidSynth
-installed, and uploads the portable build as the `midi-ddsp-portable`
-artifact: framework-dependent and platform-independent, run with
-`dotnet midi-ddsp.dll` wherever the .NET 8 runtime is installed.
+A self-contained Windows executable, which needs no .NET installed:
+
+```bash
+dotnet publish src/MidiDdsp.Cli -c Release -r win-x64 --self-contained \
+  -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:DebugType=None -o out-win
+out-win\midi-ddsp.exe synthesize song.mid song.wav --weights <weights-dir>
+```
+
+CI (GitHub Actions) runs one job on Linux that builds, runs every test with
+the weights and FluidSynth installed, and uploads two artifacts:
+
+- `midi-ddsp-portable`: framework-dependent and platform-independent, run with
+  `dotnet midi-ddsp.dll` wherever the .NET 8 runtime is installed.
+- `midi-ddsp-win-x64`: the self-contained `midi-ddsp.exe` (about 35 MB),
+  cross-compiled for Windows x64.
 
 ## Verifying against the original
 

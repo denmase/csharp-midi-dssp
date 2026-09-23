@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -51,11 +52,28 @@ jobs:
           dotnet publish src/MidiDdsp.Cli --no-restore -c Release
           -p:UseAppHost=false -o artifacts/midi-ddsp
 
-      - name: Add docs to the build
-        run: cp README.md artifacts/midi-ddsp/
+      # Cross-compiled self-contained single file: midi-ddsp.exe runs on
+      # Windows without .NET installed.
+      - name: Publish Windows build
+        run: |
+          dotnet publish src/MidiDdsp.Cli -c Release -r win-x64 --self-contained \
+            -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true \
+            -p:DebugType=None -o artifacts/midi-ddsp-win-x64
+          file artifacts/midi-ddsp-win-x64/midi-ddsp.exe | grep -q "PE32+ executable (console) x86-64"
+
+      - name: Add docs to the builds
+        run: |
+          cp README.md artifacts/midi-ddsp/
+          cp README.md artifacts/midi-ddsp-win-x64/
 
       - uses: actions/upload-artifact@v4
         with:
           name: midi-ddsp-portable
           path: artifacts/midi-ddsp
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: midi-ddsp-win-x64
+          path: artifacts/midi-ddsp-win-x64
           if-no-files-found: error
