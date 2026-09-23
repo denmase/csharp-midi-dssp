@@ -119,13 +119,13 @@ dotnet publish src/MidiDdsp.Cli -c Release -r win-x64 --self-contained \
 out-win\midi-ddsp.exe synthesize song.mid song.wav --weights <weights-dir>
 ```
 
-CI (GitHub Actions) builds, runs every test with the weights and FluidSynth
-installed, and uploads two artifacts:
+CI (GitHub Actions) runs one job on Linux that builds, runs every test with
+the weights and FluidSynth installed, and uploads two artifacts:
 
 - `midi-ddsp-portable`: framework-dependent and platform-independent, run with
   `dotnet midi-ddsp.dll` wherever the .NET 8 runtime is installed.
 - `midi-ddsp-win-x64`: the self-contained `midi-ddsp.exe` (about 35 MB),
-  smoke-tested on Windows by synthesizing a test MIDI file.
+  cross-compiled for Windows x64.
 
 ## Verifying against the original
 
