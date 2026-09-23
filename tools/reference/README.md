@@ -38,3 +38,4 @@ git clone https://github.com/magenta/midi-ddsp   # put it on PYTHONPATH
 |---|---|
 | `export_checkpoint_reference.py <weights_dir> <out.json>` | Name, dtype, shape, sums and first values of every tensor in both checkpoints (`checkpoint_reference.json`). |
 | `export_layer_reference.py <weights_dir> <out.npz>` | Inputs and outputs of pretrained layers and of the full Expression Generator on seeded inputs (`layer_reference.npz`). Needs the `midi-ddsp` source on `PYTHONPATH`. |
+| `export_synthesis_reference.py <weights_dir> <out.npz>` | The original pipeline from a note list to synthesis parameters, with argmax f0 (`synthesis_reference.npz`). Run with `tools/reference` and the `midi-ddsp` source on `PYTHONPATH`. |

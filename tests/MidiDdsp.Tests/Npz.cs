@@ -32,6 +32,14 @@ internal sealed partial class Npz
         return values;
     }
 
+    public double[] Doubles(string name)
+    {
+        var (_, _, data) = Get(name, "<f8");
+        var values = new double[data.Length / 8];
+        Buffer.BlockCopy(data, 0, values, 0, data.Length);
+        return values;
+    }
+
     public int[] Ints(string name)
     {
         var (_, _, data) = Get(name, "<i8");

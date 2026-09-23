@@ -16,7 +16,9 @@ Early work in progress.
   stack; each checked against the pretrained TensorFlow layers.
 - [x] Expression Generator (`MidiDdsp.Core.Models.ExpressionGenerator`),
   matching the original end to end.
-- [ ] Synthesis Generator (MIDI decoder path used for synthesis)
+- [x] Synthesis Generator (`MidiDdsp.Core.Models.SynthesisGenerator`): note
+  sequence, frame conditioning, and the MIDI decoder with top-p or argmax f0
+  sampling; matches the original's synthesis parameters with argmax sampling.
 - [ ] DDSP synthesis: harmonic, filtered noise, reverb
 - [ ] MIDI input, WAV output, end-to-end CLI
 
