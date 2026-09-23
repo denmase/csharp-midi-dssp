@@ -1,0 +1,17 @@
+MIDI-DDSP pretrained weights
+============================
+
+The files in weights/midi_ddsp_model_weights_urmp_9_10 are the unmodified
+pretrained MIDI-DDSP checkpoints (Expression Generator step 5000, Synthesis
+Generator step 50000) published by the MIDI-DDSP authors on the `models`
+branch of https://github.com/magenta/midi-ddsp, a repository licensed under
+the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0).
+
+Copyright 2022 The MIDI-DDSP Authors.
+
+Paper: Yusong Wu et al., "MIDI-DDSP: Detailed Control of Musical Performance
+via Hierarchical Modeling", ICLR 2022.
+
+The models were trained on the URMP dataset
+(https://labsites.rochester.edu/air/projects/URMP.html); check its terms before
+redistributing the weights or audio made with them.

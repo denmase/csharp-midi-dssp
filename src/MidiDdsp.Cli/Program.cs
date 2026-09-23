@@ -6,21 +6,45 @@ using MidiDdsp.Core.Dsp;
 using MidiDdsp.Core.Midi;
 using MidiDdsp.Core.Models;
 
-const string DefaultWeights = "weights/midi_ddsp_model_weights_urmp_9_10";
+const string WeightsFolder = "midi_ddsp_model_weights_urmp_9_10";
 
-return args.FirstOrDefault() switch
+try
 {
-    "synthesize" => Synthesize(args[1..]),
-    "list-weights" when args.Length == 2 => ListWeights(args[1]),
-    _ => Usage(),
-};
+    return args.FirstOrDefault() switch
+    {
+        "synthesize" => Synthesize(args[1..]),
+        "list-weights" when args.Length == 2 => ListWeights(args[1]),
+        _ => Usage(),
+    };
+}
+catch (Exception e) when (e is IOException or DllNotFoundException or InvalidDataException
+                           or NotSupportedException or FormatException or ArgumentException)
+{
+    Console.Error.WriteLine($"error: {e.Message}");
+    return 1;
+}
+
+// Places the pretrained weights are looked for when --weights is not given.
+static IEnumerable<string> WeightCandidates()
+{
+    if (Environment.GetEnvironmentVariable("MIDI_DDSP_WEIGHTS") is { Length: > 0 } fromEnv)
+        yield return fromEnv;
+    yield return Path.Combine(AppContext.BaseDirectory, "weights", WeightsFolder);
+    yield return Path.Combine(Directory.GetCurrentDirectory(), "weights", WeightsFolder);
+}
+
+static bool HasWeights(string dir) =>
+    File.Exists(Path.Combine(dir, "expression_generator", "5000.index")) &&
+    File.Exists(Path.Combine(dir, "synthesis_generator", "50000.index"));
 
 static int Usage()
 {
     Console.Error.WriteLine("""
         Usage:
           midi-ddsp synthesize <input.mid> <output.wav> [options]
-              --weights <dir>      pretrained weights (default: weights/midi_ddsp_model_weights_urmp_9_10)
+              --weights <dir>      pretrained weights (default: $MIDI_DDSP_WEIGHTS, then
+                                   weights/midi_ddsp_model_weights_urmp_9_10 next to this
+                                   program, then in the current directory)
               --seed <n>           seed for f0 sampling and noise
               --argmax             pick the most likely f0 instead of top-p sampling
               --pitch-offset <n>   transpose by n semitones
@@ -38,7 +62,7 @@ static int Usage()
 static int Synthesize(string[] args)
 {
     var positional = new List<string>();
-    string weights = DefaultWeights;
+    string? weights = null;
     string? stemsDir = null;
     bool asFloat = false;
     var options = new SynthesisOptions();
@@ -72,6 +96,16 @@ static int Synthesize(string[] args)
             WavWriter.WriteFloat32(path, audio, DdspMath.SampleRate);
         else
             WavWriter.WritePcm16(path, audio, DdspMath.SampleRate);
+    }
+
+    weights ??= WeightCandidates().FirstOrDefault(HasWeights);
+    if (weights is null)
+    {
+        Console.Error.WriteLine("error: pretrained weights not found. Looked in:");
+        foreach (var candidate in WeightCandidates())
+            Console.Error.WriteLine($"  {candidate}");
+        Console.Error.WriteLine("Download them with tools/download_weights.sh, or pass --weights <dir>.");
+        return 1;
     }
 
     var watch = Stopwatch.StartNew();
