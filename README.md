@@ -19,7 +19,8 @@ Early work in progress.
 - [x] Synthesis Generator (`MidiDdsp.Core.Models.SynthesisGenerator`): note
   sequence, frame conditioning, and the MIDI decoder with top-p or argmax f0
   sampling; matches the original's synthesis parameters with argmax sampling.
-- [ ] DDSP synthesis: harmonic, filtered noise, reverb
+- [x] DDSP synthesis (`MidiDdsp.Core.Dsp`): harmonic synthesizer, filtered
+  noise and the per-instrument learned reverb, matching ddsp 3.2.0.
 - [ ] MIDI input, WAV output, end-to-end CLI
 
 Only the inference path is ported. The DDSP Inference module (the audio
