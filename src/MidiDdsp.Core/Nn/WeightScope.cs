@@ -34,7 +34,7 @@ public sealed class WeightScope
     public float[] LoadVector(string name)
     {
         var info = _checkpoint.GetVariable(_path.Length == 0 ? name : $"{_path}/{name}");
-        if (info.Shape.Length == 0 || info.Shape[..^1].Any(d => d != 1))
+        if (info.Shape.Length == 0 || info.Shape.Take(info.Shape.Length - 1).Any(d => d != 1))
             throw new InvalidDataException(
                 $"Variable '{info.Name}' has shape [{string.Join(", ", info.Shape)}], expected a vector.");
         return _checkpoint.ReadFloats(info);

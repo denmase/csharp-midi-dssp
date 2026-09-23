@@ -26,6 +26,10 @@ Working end to end: MIDI file in, WAV out, using the pretrained models.
 - [x] MIDI input (read the way `pretty_midi` reads it), WAV output and an
   end-to-end CLI, checked against the original `synthesize_midi`.
 - [x] FluidSynth fallback for instruments the models cannot play.
+- [x] `MidiDdsp.Core` also targets .NET Framework 4.7.2, for embedding in
+  WinForms/WPF apps that haven't moved to .NET (Core) yet. Everything,
+  including the FluidSynth fallback, is available on both targets, and CI runs
+  the full test suite on both (net472 under Mono).
 
 Only the inference path is ported. The DDSP Inference module (the audio
 encoder used during training) is not needed to synthesize MIDI.

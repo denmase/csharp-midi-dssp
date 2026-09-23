@@ -8,19 +8,37 @@ namespace MidiDdsp.Core.Nn;
 public sealed class Matrix
 {
     public Matrix(int rows, int cols)
-        : this(rows, cols, new float[checked(rows * cols)])
+        : this(rows, cols, new float[CheckedSize(rows, cols)])
     {
     }
 
     public Matrix(int rows, int cols, float[] data)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(rows);
-        ArgumentOutOfRangeException.ThrowIfNegative(cols);
+        if (rows < 0)
+            throw new ArgumentOutOfRangeException(nameof(rows));
+        if (cols < 0)
+            throw new ArgumentOutOfRangeException(nameof(cols));
         if (data.Length != rows * cols)
             throw new ArgumentException($"Expected {rows * cols} values for a {rows}x{cols} matrix, got {data.Length}.");
         Rows = rows;
         Cols = cols;
         Data = data;
+    }
+
+    /// <summary>
+    /// Validates <paramref name="rows"/>/<paramref name="cols"/> before the two-arg constructor's
+    /// own array allocation, which otherwise runs first (constructor-initializer arguments are
+    /// evaluated before either constructor body) -- a negative row/column count used to reach
+    /// `new float[...]` with a negative length and fail with OverflowException instead of the
+    /// intended ArgumentOutOfRangeException, on every platform (not just this port).
+    /// </summary>
+    private static int CheckedSize(int rows, int cols)
+    {
+        if (rows < 0)
+            throw new ArgumentOutOfRangeException(nameof(rows));
+        if (cols < 0)
+            throw new ArgumentOutOfRangeException(nameof(cols));
+        return checked(rows * cols);
     }
 
     public int Rows { get; }

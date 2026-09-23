@@ -5,7 +5,7 @@ using MidiDdsp.Core.Nn;
 namespace MidiDdsp.Tests;
 
 /// <summary>Reads the little-endian float32 / int64 arrays in a NumPy .npz file.</summary>
-internal sealed partial class Npz
+internal sealed class Npz
 {
     private readonly Dictionary<string, (string Dtype, int[] Shape, byte[] Data)> _arrays = [];
 
@@ -72,20 +72,18 @@ internal sealed partial class Npz
         int headerStart = major == 1 ? 10 : 12;
         var header = System.Text.Encoding.ASCII.GetString(bytes, headerStart, headerLength);
 
-        var dtype = DescrRegex().Match(header).Groups[1].Value;
+        var dtype = DescrPattern.Match(header).Groups[1].Value;
         if (header.Contains("'fortran_order': True"))
             throw new NotSupportedException("Fortran-ordered arrays are not supported.");
-        var shape = ShapeRegex().Match(header).Groups[1].Value
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        var shape = ShapePattern.Match(header).Groups[1].Value
+            .Split(',')
+            .Select(d => d.Trim()).Where(d => d.Length > 0)
             .Select(int.Parse).ToArray();
-        return (dtype, shape, bytes[(headerStart + headerLength)..]);
+        return (dtype, shape, bytes.AsSpan(headerStart + headerLength).ToArray());
     }
 
-    [GeneratedRegex(@"'descr':\s*'([^']*)'")]
-    private static partial Regex DescrRegex();
-
-    [GeneratedRegex(@"'shape':\s*\(([^)]*)\)")]
-    private static partial Regex ShapeRegex();
+    private static readonly Regex DescrPattern = new(@"'descr':\s*'([^']*)'");
+    private static readonly Regex ShapePattern = new(@"'shape':\s*\(([^)]*)\)");
 }
 
 internal static class AssertClose

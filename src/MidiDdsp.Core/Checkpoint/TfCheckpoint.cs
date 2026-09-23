@@ -69,8 +69,10 @@ public sealed class TfCheckpoint : IDisposable
 
         int numShards = 1;
         var tensors = new Dictionary<string, CheckpointTensorInfo>(StringComparer.Ordinal);
-        foreach (var (key, value) in SSTable.ReadAll(File.ReadAllBytes(indexPath)))
+        foreach (var entry in SSTable.ReadAll(File.ReadAllBytes(indexPath)))
         {
+            var key = entry.Key;
+            var value = entry.Value;
             if (key.Length == 0)
                 numShards = ParseHeader(value);
             else
@@ -111,7 +113,14 @@ public sealed class TfCheckpoint : IDisposable
         var stream = GetShard(info.ShardId);
         var bytes = new byte[info.Size];
         stream.Seek(info.Offset, SeekOrigin.Begin);
-        stream.ReadExactly(bytes);
+        int totalRead = 0;
+        while (totalRead < bytes.Length)
+        {
+            int read = stream.Read(bytes, totalRead, bytes.Length - totalRead);
+            if (read == 0)
+                throw new EndOfStreamException($"Unexpected end of stream reading tensor '{info.Name}'.");
+            totalRead += read;
+        }
 
         uint actual = MaskCrc(Crc32c(bytes));
         if (actual != info.MaskedCrc32c)
@@ -213,13 +222,29 @@ public sealed class TfCheckpoint : IDisposable
     internal static uint Crc32c(ReadOnlySpan<byte> data)
     {
         uint crc = 0xFFFFFFFF;
+#if NETFRAMEWORK
+        // .NET Framework has no BitOperations.Crc32C; use the standard 256-entry table.
+        foreach (var b in data)
+            crc = Crc32cTable[(crc ^ b) & 0xFF] ^ (crc >> 8);
+#else
         int i = 0;
         for (; i + 8 <= data.Length; i += 8)
             crc = BitOperations.Crc32C(crc, BitConverter.ToUInt64(data.Slice(i, 8)));
         for (; i < data.Length; i++)
             crc = BitOperations.Crc32C(crc, data[i]);
+#endif
         return ~crc;
     }
+
+#if NETFRAMEWORK
+    private static readonly uint[] Crc32cTable = Enumerable.Range(0, 256).Select(i =>
+    {
+        uint c = (uint)i;
+        for (int bit = 0; bit < 8; bit++)
+            c = (c & 1) != 0 ? (c >> 1) ^ 0x82F63B78u : c >> 1;
+        return c;
+    }).ToArray();
+#endif
 
     /// <summary>LevelDB/TensorFlow checksum masking (crc32c::Mask).</summary>
     internal static uint MaskCrc(uint crc) => ((crc >> 15) | (crc << 17)) + 0xa282ead8u;

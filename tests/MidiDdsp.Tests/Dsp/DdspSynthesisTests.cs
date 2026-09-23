@@ -15,12 +15,12 @@ public class DdspSynthesisTests
     private static readonly Npz Parameters = Npz.LoadReference("synthesis_reference.npz");
     private static readonly int Frames = Reference.Ints("num_frames")[0];
 
-    private static float[] FirstFrames(string name) => Parameters.Floats(name)[..Frames];
+    private static float[] FirstFrames(string name) => Parameters.Floats(name).AsSpan(0, Frames).ToArray();
 
     private static Matrix FirstFrameRows(string name)
     {
         var m = Parameters.Matrix(name);
-        return new Matrix(Frames, m.Cols, m.Data[..(Frames * m.Cols)]);
+        return new Matrix(Frames, m.Cols, m.Data.AsSpan(0, Frames * m.Cols).ToArray());
     }
 
     private static HarmonicControls HarmonicControls() =>
@@ -98,7 +98,7 @@ public class ReverbImpulseResponseTests
 
         Assert.Equal(48000, ir.Length);
         Assert.Equal(0f, ir[0]);
-        Assert.Equal(stored[1..16000].ToArray(), ir[1..16000]);
+        Assert.Equal(stored[1..16000].ToArray(), ir.AsSpan(1, 15999).ToArray());
         Assert.Equal(stored[16000], ir[16000]);                               // exp(0)
         Assert.Equal(stored[^1] * MathF.Exp(-4f), ir[^1], 1e-9f);             // exp(-4) at the end
     }

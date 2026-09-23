@@ -21,8 +21,8 @@ public class F0SamplerTests
         for (int i = 0; i < 20_000; i++)
             counts[sampler.Sample(logits)]++;
 
-        Assert.All(counts[3..], c => Assert.Equal(0, c));
-        Assert.All(counts[..3], c => Assert.True(c > 0));
+        Assert.All(counts.Skip(3), c => Assert.Equal(0, c));
+        Assert.All(counts.Take(3), c => Assert.True(c > 0));
         // Renormalized over the nucleus, index 0 has probability ≈ 0.665.
         Assert.InRange(counts[0] / 20_000.0, 0.64, 0.69);
     }
