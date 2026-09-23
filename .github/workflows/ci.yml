@@ -59,3 +59,54 @@ jobs:
           name: midi-ddsp-portable
           path: artifacts/midi-ddsp
           if-no-files-found: error
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      # Self-contained single file: midi-ddsp.exe runs without .NET installed.
+      - name: Publish Windows build
+        run: >
+          dotnet publish src/MidiDdsp.Cli -c Release -r win-x64 --self-contained
+          -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true
+          -p:DebugType=None -o artifacts/midi-ddsp-win-x64
+
+      - name: Cache pretrained weights
+        id: weights
+        uses: actions/cache@v4
+        with:
+          path: weights
+          key: midi-ddsp-weights-urmp-9-10-windows
+
+      - name: Download pretrained weights
+        if: steps.weights.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force weights | Out-Null
+          Invoke-WebRequest -Uri https://github.com/magenta/midi-ddsp/raw/models/midi_ddsp_model_weights_urmp_9_10.zip -OutFile weights/weights.zip
+          Expand-Archive weights/weights.zip -DestinationPath weights
+          Remove-Item weights/weights.zip
+
+      - name: Smoke test the exe
+        shell: pwsh
+        run: |
+          artifacts/midi-ddsp-win-x64/midi-ddsp.exe synthesize tests/MidiDdsp.Tests/Reference/pipeline_test.mid smoke.wav --seed 1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $size = (Get-Item smoke.wav).Length
+          Write-Host "smoke.wav: $size bytes"
+          if ($size -lt 100000) { throw "smoke.wav is too small" }
+
+      - name: Add docs to the build
+        shell: pwsh
+        run: Copy-Item README.md artifacts/midi-ddsp-win-x64/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: midi-ddsp-win-x64
+          path: artifacts/midi-ddsp-win-x64
+          if-no-files-found: error
