@@ -51,8 +51,9 @@ static int Usage()
               --speed <rate>       playback speed (default 1)
               --stems <dir>        also write each part to <dir>/<part>_<instrument>.wav
               --fluidsynth         render other instruments with FluidSynth instead of skipping them
-              --soundfont <sf2>    soundfont for --fluidsynth (default: FluidR3_GM.sf2 or another GM
-                                   soundfont in /usr/share/sounds/sf2)
+              --soundfont <sf2>    soundfont for --fluidsynth (default: a .sf2 file next to this program
+                                   or in its soundfonts folder, else a GM soundfont in
+                                   /usr/share/sounds/sf2)
               --float              write 32-bit float WAV instead of 16-bit PCM
           midi-ddsp list-weights <checkpoint-prefix>
         """);

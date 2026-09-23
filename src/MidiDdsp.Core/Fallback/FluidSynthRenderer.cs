@@ -23,15 +23,30 @@ public sealed class FluidSynthRenderer
     public string SoundFontPath { get; }
     public int SampleRate { get; }
 
-    /// <summary>Soundfonts tried when none is given; the first is the original's default.</summary>
-    public static readonly IReadOnlyList<string> DefaultSoundFonts =
+    private static readonly string[] SystemSoundFonts =
     [
-        "/usr/share/sounds/sf2/FluidR3_GM.sf2",
+        "/usr/share/sounds/sf2/FluidR3_GM.sf2", // the original's default
         "/usr/share/sounds/sf2/default-GM.sf2",
         "/usr/share/sounds/sf2/TimGM6mb.sf2",
         "/usr/share/soundfonts/FluidR3_GM.sf2",
         "/usr/share/soundfonts/default.sf2",
     ];
+
+    /// <summary>
+    /// Soundfonts tried when none is given: any .sf2 file next to the program or
+    /// in a <c>soundfonts</c> folder beside it (in name order), then the usual
+    /// Linux locations, the first of which is the original's default.
+    /// </summary>
+    public static IReadOnlyList<string> DefaultSoundFonts
+    {
+        get
+        {
+            var local = new[] { AppContext.BaseDirectory, Path.Combine(AppContext.BaseDirectory, "soundfonts") }
+                .Where(Directory.Exists)
+                .SelectMany(dir => Directory.GetFiles(dir, "*.sf2").Order(StringComparer.OrdinalIgnoreCase));
+            return local.Concat(SystemSoundFonts).ToList();
+        }
+    }
 
     /// <summary>
     /// Checks that libfluidsynth and the soundfont are available.
@@ -43,7 +58,8 @@ public sealed class FluidSynthRenderer
             throw new DllNotFoundException(error);
         soundFontPath ??= DefaultSoundFonts.FirstOrDefault(File.Exists)
             ?? throw new FileNotFoundException(
-                $"No soundfont given and none found at {string.Join(", ", DefaultSoundFonts)}.");
+                "No soundfont given (--soundfont) and no .sf2 file found next to this program, in its " +
+                $"soundfonts folder, or at {string.Join(", ", SystemSoundFonts)}.");
         if (!File.Exists(soundFontPath))
             throw new FileNotFoundException($"Soundfont not found: {soundFontPath}", soundFontPath);
         return new FluidSynthRenderer(soundFontPath, sampleRate);
