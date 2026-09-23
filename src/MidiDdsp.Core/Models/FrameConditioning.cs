@@ -96,7 +96,7 @@ public sealed class FrameConditioning
             {
                 var row = features.Row(t);
                 for (int c = 0; c < n; c++)
-                    row[c] = Math.Clamp(controls[c], 0f, 1f);
+                    row[c] = Math.Max(0f, Math.Min(1f, controls[c]));
                 qPitch[t] = notes.Pitches[i];
             }
             if (on < frames)

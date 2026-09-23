@@ -1,18 +1,26 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>net8.0;net472</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>12.0</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="MidiDdsp.Tests" />
   </ItemGroup>
 
+  <!-- The FluidSynth fallback (MidiDdsp.Core.Fallback) needs .NET 7+'s LibraryImport-based P/Invoke
+       marshalling, with no .NET Framework equivalent. Excluded from net472; MidiDdspSynthesizer's
+       own use of it is likewise #if-guarded (see MidiDdspSynthesizer.cs). -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
+    <Compile Remove="Fallback\**\*.cs" />
+  </ItemGroup>
+
   <ItemGroup>
-    <PackageReference Include="System.Numerics.Tensors" Version="8.0.0" />
+    <PackageReference Include="System.Numerics.Tensors" Version="9.0.0" />
   </ItemGroup>
 
 </Project>

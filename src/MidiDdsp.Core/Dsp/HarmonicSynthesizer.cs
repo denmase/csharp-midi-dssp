@@ -84,7 +84,7 @@ public sealed class HarmonicSynthesizer
                 // angular_cumsum: restart each chunk's cumsum from the wrapped end of the last.
                 for (int k = 0; k < harmonics; k++)
                     chunkOffset[k] = (chunkOffset[k] + phase[k] % twoPi) % twoPi;
-                Array.Clear(phase);
+                Array.Clear(phase, 0, phase.Length);
             }
 
             float sample = 0;

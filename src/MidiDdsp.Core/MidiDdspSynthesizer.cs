@@ -1,6 +1,8 @@
 using MidiDdsp.Core.Checkpoint;
 using MidiDdsp.Core.Dsp;
+#if !NETFRAMEWORK
 using MidiDdsp.Core.Fallback;
+#endif
 using MidiDdsp.Core.Midi;
 using MidiDdsp.Core.Models;
 using MidiDdsp.Core.Nn;
@@ -106,11 +108,19 @@ public sealed class MidiDdspSynthesizer
         var parts = new List<(int Number, MidiInstrument Part, Instrument Instrument, Matrix Expression, FrameConditioning Conditioning)>();
         var fallback = new List<FallbackPartResult>();
         var skipped = new List<MidiInstrument>();
+#if !NETFRAMEWORK
         FluidSynthRenderer? fluidSynth = null;
+#endif
         for (int i = 0; i < midi.Instruments.Count; i++)
         {
             var part = midi.Instruments[i];
             var instrument = Instruments.ForMidiProgram(part.Program);
+#if !NETFRAMEWORK
+            // FluidSynth interop (MidiDdsp.Core.Fallback) needs .NET 7+'s LibraryImport-based
+            // marshalling, with no .NET Framework equivalent -- unavailable on net472, which
+            // NoteEditor doesn't need it for anyway (it already renders every non-DDSP instrument
+            // through its own BASS/soundfont engine). A net472 build always falls through to the
+            // plain "skip" branch below instead, exactly as if UseFluidSynth were never set.
             if (instrument is null && options.UseFluidSynth && part.Notes.Count > 0)
             {
                 fluidSynth ??= FluidSynthRenderer.Create(options.SoundFontPath, DdspMath.SampleRate);
@@ -119,6 +129,7 @@ public sealed class MidiDdspSynthesizer
                 fallback.Add(new FallbackPartResult(i, part, audio));
                 continue;
             }
+#endif
             if (instrument is null || part.Notes.Count == 0)
             {
                 skipped.Add(part);

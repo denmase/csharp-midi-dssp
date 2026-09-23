@@ -96,8 +96,8 @@ public sealed class FftConvolver
         for (int start = 0; start < signal.Length; start += _blockSize)
         {
             int count = Math.Min(_blockSize, signal.Length - start);
-            Array.Clear(re);
-            Array.Clear(im);
+            Array.Clear(re, 0, re.Length);
+            Array.Clear(im, 0, im.Length);
             for (int i = 0; i < count; i++)
                 re[i] = signal[start + i];
 

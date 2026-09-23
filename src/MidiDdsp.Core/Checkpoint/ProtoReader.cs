@@ -1,3 +1,5 @@
+using System.Buffers.Binary;
+
 namespace MidiDdsp.Core.Checkpoint;
 
 /// <summary>
@@ -44,7 +46,7 @@ internal ref struct ProtoReader
     {
         if (_pos + 4 > _data.Length)
             throw new InvalidDataException("Truncated protobuf fixed32.");
-        uint v = BitConverter.ToUInt32(_data.Slice(_pos, 4));
+        uint v = BinaryPrimitives.ReadUInt32LittleEndian(_data.Slice(_pos, 4));
         _pos += 4;
         return v;
     }

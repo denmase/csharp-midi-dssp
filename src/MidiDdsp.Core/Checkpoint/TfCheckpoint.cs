@@ -69,8 +69,10 @@ public sealed class TfCheckpoint : IDisposable
 
         int numShards = 1;
         var tensors = new Dictionary<string, CheckpointTensorInfo>(StringComparer.Ordinal);
-        foreach (var (key, value) in SSTable.ReadAll(File.ReadAllBytes(indexPath)))
+        foreach (var entry in SSTable.ReadAll(File.ReadAllBytes(indexPath)))
         {
+            var key = entry.Key;
+            var value = entry.Value;
             if (key.Length == 0)
                 numShards = ParseHeader(value);
             else
@@ -111,7 +113,14 @@ public sealed class TfCheckpoint : IDisposable
         var stream = GetShard(info.ShardId);
         var bytes = new byte[info.Size];
         stream.Seek(info.Offset, SeekOrigin.Begin);
-        stream.ReadExactly(bytes);
+        int totalRead = 0;
+        while (totalRead < bytes.Length)
+        {
+            int read = stream.Read(bytes, totalRead, bytes.Length - totalRead);
+            if (read == 0)
+                throw new EndOfStreamException($"Unexpected end of stream reading tensor '{info.Name}'.");
+            totalRead += read;
+        }
 
         uint actual = MaskCrc(Crc32c(bytes));
         if (actual != info.MaskedCrc32c)
@@ -213,11 +222,24 @@ public sealed class TfCheckpoint : IDisposable
     internal static uint Crc32c(ReadOnlySpan<byte> data)
     {
         uint crc = 0xFFFFFFFF;
+#if NETFRAMEWORK
+        // BitOperations.Crc32C (SSE4.2 CRC32 instruction semantics) has no .NET Framework
+        // equivalent. This reflected, bit-by-bit CRC32C update reproduces the exact same result
+        // byte-by-byte (verified against the same standard check value Crc32cTests asserts on
+        // net8.0: 0xE3069283 for "123456789"), just without hardware acceleration.
+        foreach (var b in data)
+        {
+            crc ^= b;
+            for (int bit = 0; bit < 8; bit++)
+                crc = (crc & 1) != 0 ? (crc >> 1) ^ 0x82F63B78u : crc >> 1;
+        }
+#else
         int i = 0;
         for (; i + 8 <= data.Length; i += 8)
             crc = BitOperations.Crc32C(crc, BitConverter.ToUInt64(data.Slice(i, 8)));
         for (; i < data.Length; i++)
             crc = BitOperations.Crc32C(crc, data[i]);
+#endif
         return ~crc;
     }
 

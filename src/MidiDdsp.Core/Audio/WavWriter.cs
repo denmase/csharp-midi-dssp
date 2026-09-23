@@ -15,7 +15,7 @@ public static class WavWriter
         using var writer = new BinaryWriter(stream);
         WriteHeader(writer, samples.Length, sampleRate, bitsPerSample: 16, formatTag: 1);
         foreach (var s in samples)
-            writer.Write((short)Math.Round(Math.Clamp(s, -1f, 1f) * 32767f));
+            writer.Write((short)Math.Round(Math.Max(-1f, Math.Min(1f, s)) * 32767f));
     }
 
     /// <summary>Writes 32-bit IEEE float samples, without clipping.</summary>

@@ -38,8 +38,8 @@ public sealed class Gru
             throw new InvalidDataException("Only reset_after=True GRUs (bias shape [2, 3u]) are supported.");
         int gates = biasShape[1];
         return new Gru(
-            new Dense(kernel, bias[..gates], kernelShape[0]),
-            new Dense(recurrent, bias[gates..], recurrentShape[0]));
+            new Dense(kernel, bias.AsSpan(0, gates).ToArray(), kernelShape[0]),
+            new Dense(recurrent, bias.AsSpan(gates).ToArray(), recurrentShape[0]));
     }
 
     /// <summary>Advances the state <paramref name="h"/> by one input frame, in place.</summary>

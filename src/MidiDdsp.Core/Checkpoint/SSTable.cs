@@ -1,3 +1,5 @@
+using System.Buffers.Binary;
+
 namespace MidiDdsp.Core.Checkpoint;
 
 /// <summary>
@@ -18,7 +20,7 @@ internal static class SSTable
             throw new InvalidDataException("Checkpoint index is too small to be an SSTable.");
 
         var footer = file.AsSpan(file.Length - FooterSize);
-        ulong magic = BitConverter.ToUInt64(footer[^8..]);
+        ulong magic = BinaryPrimitives.ReadUInt64LittleEndian(footer[^8..]);
         if (magic != TableMagic)
             throw new InvalidDataException("Checkpoint index has a bad SSTable magic number.");
 
@@ -53,7 +55,7 @@ internal static class SSTable
                 $"SSTable block uses compression type {compression}; only uncompressed blocks are supported.");
 
         var block = file.AsSpan(offset, size);
-        int numRestarts = (int)BitConverter.ToUInt32(block[^4..]);
+        int numRestarts = (int)BinaryPrimitives.ReadUInt32LittleEndian(block[^4..]);
         int entriesEnd = block.Length - 4 - 4 * numRestarts;
         if (entriesEnd < 0)
             throw new InvalidDataException("SSTable block has a bad restart count.");
