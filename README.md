@@ -37,6 +37,11 @@ tools/download_weights.sh
 dotnet run -c Release --project src/MidiDdsp.Cli -- synthesize song.mid song.wav
 ```
 
+The CLI looks for the weights in `$MIDI_DDSP_WEIGHTS`, then in
+`weights/midi_ddsp_model_weights_urmp_9_10` next to the program (where the CI
+builds bundle them), then under the current directory; `--weights <dir>`
+overrides this.
+
 Options: `--seed <n>` for repeatable output, `--argmax` for deterministic
 pitch, `--pitch-offset <n>`, `--speed <rate>`, `--stems <dir>` to also write
 each part, `--float` for 32-bit float WAV, `--weights <dir>`,
@@ -126,6 +131,11 @@ the weights and FluidSynth installed, and uploads two artifacts:
   `dotnet midi-ddsp.dll` wherever the .NET 8 runtime is installed.
 - `midi-ddsp-win-x64`: the self-contained `midi-ddsp.exe` (about 35 MB),
   cross-compiled for Windows x64.
+
+Both include the pretrained weights in `weights/` (with a `NOTICE.txt` on
+where they come from), so they run out of the box:
+`midi-ddsp.exe synthesize song.mid song.wav`. The portable build is
+smoke-tested with its bundled weights before upload.
 
 ## Verifying against the original
 

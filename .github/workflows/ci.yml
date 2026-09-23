@@ -61,10 +61,25 @@ jobs:
             -p:DebugType=None -o artifacts/midi-ddsp-win-x64
           file artifacts/midi-ddsp-win-x64/midi-ddsp.exe | grep -q "PE32+ executable (console) x86-64"
 
-      - name: Add docs to the builds
+      # Bundle the pretrained checkpoints so the builds run out of the box;
+      # the CLI looks for weights/ next to itself.
+      - name: Add weights and docs to the builds
         run: |
-          cp README.md artifacts/midi-ddsp/
-          cp README.md artifacts/midi-ddsp-win-x64/
+          for dir in artifacts/midi-ddsp artifacts/midi-ddsp-win-x64; do
+            dest=$dir/weights/midi_ddsp_model_weights_urmp_9_10
+            mkdir -p $dest/expression_generator $dest/synthesis_generator
+            cp weights/midi_ddsp_model_weights_urmp_9_10/expression_generator/5000.* $dest/expression_generator/
+            cp weights/midi_ddsp_model_weights_urmp_9_10/synthesis_generator/50000.* $dest/synthesis_generator/
+            cp tools/WEIGHTS-NOTICE.txt $dir/weights/NOTICE.txt
+            cp README.md $dir/
+          done
+
+      - name: Smoke test the portable build with its bundled weights
+        run: |
+          cd "$RUNNER_TEMP"
+          dotnet "$GITHUB_WORKSPACE/artifacts/midi-ddsp/midi-ddsp.dll" synthesize \
+            "$GITHUB_WORKSPACE/tests/MidiDdsp.Tests/Reference/pipeline_test.mid" smoke.wav --seed 1
+          test "$(stat -c %s smoke.wav)" -gt 100000
 
       - uses: actions/upload-artifact@v4
         with:
