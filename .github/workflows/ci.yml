@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      # libfluidsynth and the soundfont the FluidSynth reference was rendered with.
+      - name: Install FluidSynth
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libfluidsynth3 timgm6mb-soundfont
+
+      - name: Cache pretrained weights
+        id: weights
+        uses: actions/cache@v4
+        with:
+          path: weights
+          key: midi-ddsp-weights-urmp-9-10
+
+      - name: Download pretrained weights
+        if: steps.weights.outputs.cache-hit != 'true'
+        run: tools/download_weights.sh
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore -c Release
+
+      - name: Test
+        run: dotnet test --no-build -c Release --logger "console;verbosity=normal"
+
+      # Framework-dependent and RID-independent: runs with `dotnet midi-ddsp.dll`
+      # on any OS with the .NET 8 runtime.
+      - name: Publish portable build
+        run: >
+          dotnet publish src/MidiDdsp.Cli --no-restore -c Release
+          -p:UseAppHost=false -o artifacts/midi-ddsp
+
+      - name: Add docs to the build
+        run: cp README.md artifacts/midi-ddsp/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: midi-ddsp-portable
+          path: artifacts/midi-ddsp
+          if-no-files-found: error
