@@ -22,39 +22,84 @@ internal static partial class FluidSynthNative
                "/opt/homebrew/lib/libfluidsynth.dylib", "/usr/local/lib/libfluidsynth.dylib"]
             : ["libfluidsynth.so.3", "libfluidsynth.so.2", "libfluidsynth.so"];
 
+    private static readonly Lazy<(IntPtr Handle, string? Error)> Loaded = new(Load);
+
     static FluidSynthNative()
     {
         NativeLibrary.SetDllImportResolver(typeof(FluidSynthNative).Assembly, Resolve);
     }
 
-    /// <summary>Loads libfluidsynth, returning false if it cannot be found.</summary>
+    /// <summary>Loads libfluidsynth, returning false (with a reason) if it cannot be loaded.</summary>
     public static bool TryLoad(out string? error)
     {
-        if (TryLoadHandle(out _))
-        {
-            error = null;
-            return true;
-        }
-        error = Environment.GetEnvironmentVariable(LibraryVariable) is { Length: > 0 } path
-            ? $"Could not load libfluidsynth from {path} ({LibraryVariable})."
-            : $"Could not find libfluidsynth (tried {string.Join(", ", Candidates)}). " +
-              $"Install FluidSynth 2.x or set {LibraryVariable} to the library's path.";
-        return false;
+        error = Loaded.Value.Error;
+        return Loaded.Value.Handle != IntPtr.Zero;
     }
 
     private static IntPtr Resolve(string name, Assembly assembly, DllImportSearchPath? searchPath) =>
-        name == Library && TryLoadHandle(out var handle) ? handle : IntPtr.Zero;
+        name == Library ? Loaded.Value.Handle : IntPtr.Zero;
 
-    private static bool TryLoadHandle(out IntPtr handle)
+    /// <summary>
+    /// Tries <see cref="LibraryVariable"/>, then each candidate next to the
+    /// program, then each candidate on the system's library search path. When a
+    /// library file exists but fails to load, the loader's message is kept: on
+    /// Windows that usually means its dependency DLLs are missing, or it is a
+    /// 32-bit build.
+    /// </summary>
+    private static (IntPtr, string?) Load()
     {
         var configured = Environment.GetEnvironmentVariable(LibraryVariable);
         if (!string.IsNullOrEmpty(configured))
-            return NativeLibrary.TryLoad(configured, out handle);
+        {
+            return TryLoadFile(configured, out var handle, out var reason)
+                ? (handle, null)
+                : (IntPtr.Zero, $"Could not load libfluidsynth from {configured} ({LibraryVariable}): {reason}");
+        }
+
+        string? firstFailure = null;
         foreach (var candidate in Candidates)
-            if (NativeLibrary.TryLoad(candidate, typeof(FluidSynthNative).Assembly, null, out handle))
-                return true;
-        handle = IntPtr.Zero;
-        return false;
+        {
+            var local = Path.Combine(AppContext.BaseDirectory, candidate);
+            if (!File.Exists(local))
+                continue;
+            if (TryLoadFile(local, out var handle, out var reason))
+                return (handle, null);
+            firstFailure ??= $"Found {local} but could not load it: {reason}";
+        }
+
+        foreach (var candidate in Candidates)
+        {
+            if (NativeLibrary.TryLoad(candidate, typeof(FluidSynthNative).Assembly, null, out var handle))
+                return (handle, null);
+        }
+
+        if (firstFailure is not null)
+        {
+            return (IntPtr.Zero, firstFailure + (OperatingSystem.IsWindows()
+                ? " Copy every DLL from the bin folder of a 64-bit (x64) FluidSynth release next to it, not only libfluidsynth-3.dll."
+                : ""));
+        }
+        return (IntPtr.Zero,
+            $"Could not find libfluidsynth (tried {string.Join(", ", Candidates)} next to this program and on the " +
+            $"library search path). Install FluidSynth 2.x or set {LibraryVariable} to the library's path.");
+    }
+
+    private static bool TryLoadFile(string path, out IntPtr handle, out string? reason)
+    {
+        try
+        {
+            handle = NativeLibrary.Load(path);
+            reason = null;
+            return true;
+        }
+        catch (Exception e) when (e is DllNotFoundException or BadImageFormatException)
+        {
+            handle = IntPtr.Zero;
+            reason = e is BadImageFormatException
+                ? "it is not a 64-bit library for this platform."
+                : e.Message;
+            return false;
+        }
     }
 
     [LibraryImport(Library, EntryPoint = "new_fluid_settings")]

@@ -66,11 +66,19 @@ library, loaded at run time:
 
 - Linux: `sudo apt install libfluidsynth3 fluid-soundfont-gm`
 - macOS: `brew install fluid-synth`
-- Windows: a FluidSynth release, with `libfluidsynth-3.dll` on `PATH`
+- Windows: download the **x64** release zip from
+  [FluidSynth's releases](https://github.com/FluidSynth/fluidsynth/releases)
+  and copy **every DLL in its `bin` folder** next to `midi-ddsp.exe` (or put
+  that folder on `PATH`). `libfluidsynth-3.dll` alone is not enough: Windows
+  will not load it without the DLLs it depends on.
 
-Set `MIDI_DDSP_FLUIDSYNTH_LIBRARY` to the library's path if it is not found.
-Without `--soundfont`, `FluidR3_GM.sf2` (the original's default) or another GM
-soundfont in `/usr/share/sounds/sf2` is used.
+The library is looked for next to the program first, then on the system's
+library search path; set `MIDI_DDSP_FLUIDSYNTH_LIBRARY` to its full path to
+override. If it is found but cannot be loaded, the error says why.
+
+Without `--soundfont`, the first `.sf2` file next to the program or in a
+`soundfonts` folder beside it is used, else `FluidR3_GM.sf2` (the original's
+default) or another GM soundfont in `/usr/share/sounds/sf2`.
 
 The original's fallback does not work as released: it fails with a `KeyError`
 for every program except 26, and it adds pyfluidsynth's 16-bit integer samples
