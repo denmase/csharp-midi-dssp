@@ -44,6 +44,21 @@ public sealed class FrameConditioning
 
     public int FrameCount => QuantizedPitch.Length;
 
+    /// <summary>
+    /// Zero-pads to <paramref name="frames"/> frames, as the original does to
+    /// batch parts of different lengths (<c>ensure_same_length</c>).
+    /// </summary>
+    public FrameConditioning PadTo(int frames)
+    {
+        if (frames < FrameCount)
+            throw new ArgumentOutOfRangeException(nameof(frames), "Cannot pad to fewer frames.");
+        var features = new Matrix(frames, FeatureSize);
+        Features.Data.CopyTo(features.Data, 0);
+        var pitch = new float[frames];
+        QuantizedPitch.CopyTo(pitch, 0);
+        return new FrameConditioning(features, pitch);
+    }
+
     /// <param name="notes">The note sequence given to the Expression Generator.</param>
     /// <param name="expression">Expression Generator output, <c>[notes, 6]</c>; clipped to [0, 1] here.</param>
     public static FrameConditioning Build(NoteSequence notes, Matrix expression)
