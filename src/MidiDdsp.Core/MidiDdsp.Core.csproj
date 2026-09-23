@@ -10,4 +10,8 @@
     <InternalsVisibleTo Include="MidiDdsp.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="System.Numerics.Tensors" Version="8.0.0" />
+  </ItemGroup>
+
 </Project>

@@ -11,8 +11,11 @@ Early work in progress.
 - [x] Read the pretrained TensorFlow checkpoints directly from C#
   (`MidiDdsp.Core.Checkpoint.TfCheckpoint`), verified tensor-by-tensor against
   TensorFlow's own reader.
-- [ ] Neural network layers (Dense, Embedding, GRU, LayerNorm, dilated Conv1D)
-- [ ] Expression Generator
+- [x] Neural network layers (`MidiDdsp.Core.Nn`): Dense, Embedding, GRU and
+  bidirectional GRU, Keras and ddsp layer norms, `FcStackOut`, dilated conv
+  stack; each checked against the pretrained TensorFlow layers.
+- [x] Expression Generator (`MidiDdsp.Core.Models.ExpressionGenerator`),
+  matching the original end to end.
 - [ ] Synthesis Generator (MIDI decoder path used for synthesis)
 - [ ] DDSP synthesis: harmonic, filtered noise, reverb
 - [ ] MIDI input, WAV output, end-to-end CLI
