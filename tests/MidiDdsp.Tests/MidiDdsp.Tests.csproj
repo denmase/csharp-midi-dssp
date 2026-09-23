@@ -23,7 +23,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Using Include="Xunit" />
     <None Include="Reference\**" CopyToOutputDirectory="PreserveNewest" LinkBase="Reference" />
   </ItemGroup>
 
