@@ -1,7 +1,7 @@
 namespace MidiDdsp.Core.Models;
 
 /// <summary>A MIDI note with times in seconds.</summary>
-public readonly record struct MidiNote(double Start, double End, int Pitch);
+public readonly record struct MidiNote(double Start, double End, int Pitch, int Velocity = 100);
 
 /// <summary>
 /// A monophonic note sequence at the 250 Hz frame rate, with rests as pitch 0:

@@ -1,5 +1,6 @@
 using MidiDdsp.Core.Checkpoint;
 using MidiDdsp.Core.Dsp;
+using MidiDdsp.Core.Fallback;
 using MidiDdsp.Core.Midi;
 using MidiDdsp.Core.Models;
 using MidiDdsp.Core.Nn;
@@ -18,6 +19,18 @@ public sealed record SynthesisOptions
 
     /// <summary>Seed for f0 sampling and noise; null for a random seed.</summary>
     public int? Seed { get; init; }
+
+    /// <summary>
+    /// Render parts MIDI-DDSP cannot play with FluidSynth instead of skipping
+    /// them (the original's <c>use_fluidsynth</c>). Needs libfluidsynth 2.x.
+    /// </summary>
+    public bool UseFluidSynth { get; init; }
+
+    /// <summary>Soundfont for FluidSynth; null tries <see cref="FluidSynthRenderer.DefaultSoundFonts"/>.</summary>
+    public string? SoundFontPath { get; init; }
+
+    /// <summary>Volume of FluidSynth parts relative to full scale; the original uses 0.25.</summary>
+    public float FluidSynthVolume { get; init; } = 0.25f;
 }
 
 /// <summary>One synthesized instrument part.</summary>
@@ -31,9 +44,13 @@ public sealed record PartResult(
     Matrix NoiseMagnitudes,
     float[] Audio);
 
+/// <summary>A part rendered with FluidSynth.</summary>
+public sealed record FallbackPartResult(int PartNumber, MidiInstrument Part, float[] Audio);
+
 public sealed record MidiSynthesisResult(
     float[] Mix,
     IReadOnlyList<PartResult> Parts,
+    IReadOnlyList<FallbackPartResult> FallbackParts,
     IReadOnlyList<MidiInstrument> SkippedParts);
 
 /// <summary>
@@ -43,9 +60,15 @@ public sealed record MidiSynthesisResult(
 /// by the Expression Generator, rendered to synthesis parameters by the
 /// Synthesis Generator and synthesized with DDSP and the instrument's reverb.
 /// Parts are zero-padded to the longest one, as in the original's batch, and
-/// summed. Other parts are skipped (the original can optionally render them
-/// with FluidSynth instead).
+/// summed. Other parts are skipped, or rendered with FluidSynth when
+/// <see cref="SynthesisOptions.UseFluidSynth"/> is set.
 /// </summary>
+/// <remarks>
+/// The original's FluidSynth fallback does not work as released: it raises a
+/// <c>KeyError</c> for every program except 26, and it mixes pyfluidsynth's
+/// 16-bit integer samples (times 0.25) with audio in [−1, 1]. Here the
+/// FluidSynth output is converted to [−1, 1] before the 0.25 volume is applied.
+/// </remarks>
 public sealed class MidiDdspSynthesizer
 {
     private readonly ExpressionGenerator _expressionGenerator;
@@ -81,11 +104,21 @@ public sealed class MidiDdspSynthesizer
         var random = options.Seed is int seed ? new Random(seed) : new Random();
 
         var parts = new List<(int Number, MidiInstrument Part, Instrument Instrument, Matrix Expression, FrameConditioning Conditioning)>();
+        var fallback = new List<FallbackPartResult>();
         var skipped = new List<MidiInstrument>();
+        FluidSynthRenderer? fluidSynth = null;
         for (int i = 0; i < midi.Instruments.Count; i++)
         {
             var part = midi.Instruments[i];
             var instrument = Instruments.ForMidiProgram(part.Program);
+            if (instrument is null && options.UseFluidSynth && part.Notes.Count > 0)
+            {
+                fluidSynth ??= FluidSynthRenderer.Create(options.SoundFontPath, DdspMath.SampleRate);
+                float scale = options.FluidSynthVolume / 32768f;
+                var audio = fluidSynth.Render(part).Select(v => v * scale).ToArray();
+                fallback.Add(new FallbackPartResult(i, part, audio));
+                continue;
+            }
             if (instrument is null || part.Notes.Count == 0)
             {
                 skipped.Add(part);
@@ -96,10 +129,7 @@ public sealed class MidiDdspSynthesizer
             parts.Add((i, part, instrument, expression, FrameConditioning.Build(sequence, expression)));
         }
 
-        if (parts.Count == 0)
-            return new MidiSynthesisResult([], [], skipped);
-
-        int frames = parts.Max(p => p.Conditioning.FrameCount);
+        int frames = parts.Count == 0 ? 0 : parts.Max(p => p.Conditioning.FrameCount);
         var sampler = new F0Sampler(options.F0Sampling, random);
         var results = new List<PartResult>();
         foreach (var p in parts)
@@ -117,9 +147,12 @@ public sealed class MidiDdspSynthesizer
             results.Add(new PartResult(p.Number, p.Part, p.Instrument, p.Expression, parameters, harmonicControls, noiseMagnitudes, audio));
         }
 
-        var mix = new float[frames * DdspMath.FrameSize];
-        for (int i = 0; i < mix.Length; i++)
-            mix[i] = (float)results.Sum(r => (double)r.Audio[i]);
-        return new MidiSynthesisResult(mix, results, skipped);
+        // ensure_same_length: every stem is zero-padded to the longest, then summed.
+        var stems = results.Select(r => r.Audio).Concat(fallback.Select(f => f.Audio)).ToList();
+        var mix = new double[stems.Count == 0 ? 0 : stems.Max(a => a.Length)];
+        foreach (var stem in stems)
+            for (int i = 0; i < stem.Length; i++)
+                mix[i] += stem[i];
+        return new MidiSynthesisResult(mix.Select(v => (float)v).ToArray(), results, fallback, skipped);
     }
 }

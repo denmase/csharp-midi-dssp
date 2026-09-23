@@ -26,6 +26,9 @@ static int Usage()
               --pitch-offset <n>   transpose by n semitones
               --speed <rate>       playback speed (default 1)
               --stems <dir>        also write each part to <dir>/<part>_<instrument>.wav
+              --fluidsynth         render other instruments with FluidSynth instead of skipping them
+              --soundfont <sf2>    soundfont for --fluidsynth (default: FluidR3_GM.sf2 or another GM
+                                   soundfont in /usr/share/sounds/sf2)
               --float              write 32-bit float WAV instead of 16-bit PCM
           midi-ddsp list-weights <checkpoint-prefix>
         """);
@@ -50,6 +53,8 @@ static int Synthesize(string[] args)
             case "--pitch-offset": options = options with { PitchOffset = int.Parse(Next()) }; break;
             case "--speed": options = options with { SpeedRate = double.Parse(Next(), System.Globalization.CultureInfo.InvariantCulture) }; break;
             case "--stems": stemsDir = Next(); break;
+            case "--fluidsynth": options = options with { UseFluidSynth = true }; break;
+            case "--soundfont": options = options with { SoundFontPath = Next() }; break;
             case "--float": asFloat = true; break;
             default:
                 if (args[i].StartsWith("--"))
@@ -74,9 +79,11 @@ static int Synthesize(string[] args)
     var midi = MidiFile.Load(positional[0]);
     var result = synthesizer.Synthesize(midi, options);
 
+    static string Describe(MidiInstrument part) => $"program {part.Program}{(part.IsDrum ? " (drums)" : "")}";
+
     foreach (var skipped in result.SkippedParts)
-        Console.WriteLine($"Skipping part with program {skipped.Program}{(skipped.IsDrum ? " (drums)" : "")}: not a MIDI-DDSP instrument.");
-    if (result.Parts.Count == 0)
+        Console.WriteLine($"Skipping part with {Describe(skipped)}: not a MIDI-DDSP instrument (use --fluidsynth to render it).");
+    if (result.Parts.Count == 0 && result.FallbackParts.Count == 0)
     {
         Console.Error.WriteLine("No part of this MIDI file uses a MIDI-DDSP instrument.");
         return 2;
@@ -84,12 +91,16 @@ static int Synthesize(string[] args)
 
     foreach (var part in result.Parts)
         Console.WriteLine($"Part {part.PartNumber}: {part.Instrument.Name}, {part.Part.Notes.Count} notes");
+    foreach (var part in result.FallbackParts)
+        Console.WriteLine($"Part {part.PartNumber}: {Describe(part.Part)} with FluidSynth, {part.Part.Notes.Count} notes");
     Write(positional[1], result.Mix);
     if (stemsDir is not null)
     {
         Directory.CreateDirectory(stemsDir);
         foreach (var part in result.Parts)
             Write(Path.Combine(stemsDir, $"{part.PartNumber}_{part.Instrument.Name}.wav"), part.Audio);
+        foreach (var part in result.FallbackParts)
+            Write(Path.Combine(stemsDir, $"{part.PartNumber}_program{part.Part.Program}_fluidsynth.wav"), part.Audio);
     }
 
     double seconds = result.Mix.Length / (double)DdspMath.SampleRate;

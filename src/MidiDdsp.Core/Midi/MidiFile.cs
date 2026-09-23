@@ -14,6 +14,11 @@ public sealed class MidiInstrument(int program, int channel, int track)
 
     /// <summary>Notes in the order <c>pretty_midi</c> lists them: by when they end.</summary>
     public List<MidiNote> Notes { get; } = [];
+
+    /// <summary>Pitch bends, −8192 to 8191, with times in seconds.</summary>
+    public List<(double Time, int Pitch)> PitchBends { get; internal set; } = [];
+
+    public List<(double Time, int Number, int Value)> ControlChanges { get; internal set; } = [];
 }
 
 /// <summary>
@@ -22,6 +27,8 @@ public sealed class MidiInstrument(int program, int channel, int track)
 /// taken from the first track only, a note-off closes every open note of that
 /// pitch and channel that did not start on the same tick, notes are listed in
 /// the order they end, and parts are ordered by their first completed note.
+/// Pitch bends and control changes before a part's first note are kept as
+/// <c>pretty_midi</c> keeps them (its "straggler" instruments).
 /// </summary>
 public sealed class MidiFile
 {
@@ -73,11 +80,41 @@ public sealed class MidiFile
     private static List<MidiInstrument> ReadInstruments(List<List<MidiEvent>> tracks, TempoMap clock)
     {
         var instruments = new Dictionary<(int Program, int Channel, int Track), MidiInstrument>();
+        var stragglers = new Dictionary<(int Channel, int Track), MidiInstrument>();
         var order = new List<MidiInstrument>();
+
+        // pretty_midi's __get_instrument: notes create instruments; pitch bends and
+        // control changes go to an existing one, or to a per-(channel, track)
+        // straggler whose event lists a later instrument on that channel shares.
+        MidiInstrument GetInstrument(int program, int channel, int track, bool createNew)
+        {
+            if (instruments.TryGetValue((program, channel, track), out var existing))
+                return existing;
+            stragglers.TryGetValue((channel, track), out var straggler);
+            if (!createNew && straggler is not null)
+                return straggler;
+
+            var instrument = new MidiInstrument(program, channel, track);
+            if (createNew)
+            {
+                if (straggler is not null)
+                {
+                    instrument.ControlChanges = straggler.ControlChanges;
+                    instrument.PitchBends = straggler.PitchBends;
+                }
+                instruments[(program, channel, track)] = instrument;
+                order.Add(instrument);
+            }
+            else
+            {
+                stragglers[(channel, track)] = instrument;
+            }
+            return instrument;
+        }
 
         for (int trackIndex = 0; trackIndex < tracks.Count; trackIndex++)
         {
-            var openNotes = new Dictionary<(int Channel, int Pitch), List<long>>();
+            var openNotes = new Dictionary<(int Channel, int Pitch), List<(long Tick, int Velocity)>>();
             var programs = new int[16];
             foreach (var e in tracks[trackIndex])
             {
@@ -90,30 +127,32 @@ public sealed class MidiFile
                         var key = (e.Channel, e.Data1);
                         if (!openNotes.TryGetValue(key, out var starts))
                             openNotes[key] = starts = [];
-                        starts.Add(e.Tick);
+                        starts.Add((e.Tick, e.Data2));
                         break;
                     case EventKind.NoteOn:
                     case EventKind.NoteOff:
                         var offKey = (e.Channel, e.Data1);
                         if (!openNotes.TryGetValue(offKey, out var open))
                             break;
-                        var toClose = open.Where(start => start != e.Tick).ToList();
-                        var toKeep = open.Where(start => start == e.Tick).ToList();
-                        foreach (var start in toClose)
+                        var toClose = open.Where(n => n.Tick != e.Tick).ToList();
+                        var toKeep = open.Where(n => n.Tick == e.Tick).ToList();
+                        foreach (var (start, velocity) in toClose)
                         {
-                            var instrumentKey = (programs[e.Channel], e.Channel, trackIndex);
-                            if (!instruments.TryGetValue(instrumentKey, out var instrument))
-                            {
-                                instruments[instrumentKey] = instrument =
-                                    new MidiInstrument(programs[e.Channel], e.Channel, trackIndex);
-                                order.Add(instrument);
-                            }
-                            instrument.Notes.Add(new MidiNote(clock.TickToTime(start), clock.TickToTime(e.Tick), e.Data1));
+                            GetInstrument(programs[e.Channel], e.Channel, trackIndex, createNew: true).Notes.Add(
+                                new MidiNote(clock.TickToTime(start), clock.TickToTime(e.Tick), e.Data1, velocity));
                         }
                         if (toClose.Count > 0 && toKeep.Count > 0)
                             openNotes[offKey] = toKeep;
                         else
                             openNotes.Remove(offKey);
+                        break;
+                    case EventKind.PitchBend:
+                        GetInstrument(programs[e.Channel], e.Channel, trackIndex, createNew: false).PitchBends.Add(
+                            (clock.TickToTime(e.Tick), ((e.Data2 << 7) | e.Data1) - 8192));
+                        break;
+                    case EventKind.ControlChange:
+                        GetInstrument(programs[e.Channel], e.Channel, trackIndex, createNew: false).ControlChanges.Add(
+                            (clock.TickToTime(e.Tick), e.Data1, e.Data2));
                         break;
                 }
             }
@@ -121,7 +160,7 @@ public sealed class MidiFile
         return order;
     }
 
-    private enum EventKind { Other, NoteOff, NoteOn, ProgramChange, SetTempo }
+    private enum EventKind { Other, NoteOff, NoteOn, ControlChange, ProgramChange, PitchBend, SetTempo }
 
     private readonly record struct MidiEvent(long Tick, EventKind Kind, int Channel, int Data1, int Data2);
 
@@ -184,7 +223,9 @@ public sealed class MidiFile
             {
                 0x80 => EventKind.NoteOff,
                 0x90 => EventKind.NoteOn,
+                0xB0 => EventKind.ControlChange,
                 0xC0 => EventKind.ProgramChange,
+                0xE0 => EventKind.PitchBend,
                 _ => EventKind.Other,
             };
             if (kind != EventKind.Other)
