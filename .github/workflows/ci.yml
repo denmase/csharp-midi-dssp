@@ -19,11 +19,12 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      # libfluidsynth and the soundfont the FluidSynth reference was rendered with.
-      - name: Install FluidSynth
+      # libfluidsynth and the soundfont the FluidSynth reference was rendered with,
+      # and Mono to run the net472 tests.
+      - name: Install FluidSynth and Mono
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libfluidsynth3 timgm6mb-soundfont
+          sudo apt-get install -y --no-install-recommends libfluidsynth3 timgm6mb-soundfont mono-devel
 
       - name: Cache pretrained weights
         id: weights
@@ -42,8 +43,15 @@ jobs:
       - name: Build
         run: dotnet build --no-restore -c Release
 
-      - name: Test
-        run: dotnet test --no-build -c Release --logger "console;verbosity=normal"
+      - name: Test (net8.0)
+        run: dotnet test --no-build -c Release -f net8.0 --logger "console;verbosity=normal"
+
+      # MidiDdsp.Core's .NET Framework build, run with xUnit's console runner under
+      # Mono (`dotnet test` on Linux cannot host .NET Framework test runs).
+      - name: Test (net472, Mono)
+        run: >
+          mono ~/.nuget/packages/xunit.runner.console/2.4.2/tools/net472/xunit.console.exe
+          tests/MidiDdsp.Tests/bin/Release/net472/MidiDdsp.Tests.dll -noshadow
 
       # Framework-dependent and RID-independent: runs with `dotnet midi-ddsp.dll`
       # on any OS with the .NET 8 runtime.

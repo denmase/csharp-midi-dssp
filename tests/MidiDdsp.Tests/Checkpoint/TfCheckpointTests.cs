@@ -33,7 +33,7 @@ public class TfCheckpointTests
     [RequiresWeightsFact]
     public void CorruptedDataFailsChecksum()
     {
-        var dir = Directory.CreateTempSubdirectory("midi-ddsp-ckpt-");
+        var dir = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "midi-ddsp-ckpt-" + Guid.NewGuid().ToString("N")));
         try
         {
             var prefix = Path.Combine(dir.FullName, "5000");
@@ -73,8 +73,8 @@ public class TfCheckpointTests
         var expected = Reference.GetProperty("checkpoints").GetProperty(key).EnumerateArray().ToList();
 
         Assert.Equal(
-            expected.Select(e => e.GetProperty("name").GetString()!).Order(StringComparer.Ordinal),
-            checkpoint.Tensors.Keys.Order(StringComparer.Ordinal));
+            expected.Select(e => e.GetProperty("name").GetString()!).OrderBy(n => n, StringComparer.Ordinal),
+            checkpoint.Tensors.Keys.OrderBy(n => n, StringComparer.Ordinal));
 
         foreach (var entry in expected)
         {

@@ -223,16 +223,9 @@ public sealed class TfCheckpoint : IDisposable
     {
         uint crc = 0xFFFFFFFF;
 #if NETFRAMEWORK
-        // BitOperations.Crc32C (SSE4.2 CRC32 instruction semantics) has no .NET Framework
-        // equivalent. This reflected, bit-by-bit CRC32C update reproduces the exact same result
-        // byte-by-byte (verified against the same standard check value Crc32cTests asserts on
-        // net8.0: 0xE3069283 for "123456789"), just without hardware acceleration.
+        // .NET Framework has no BitOperations.Crc32C; use the standard 256-entry table.
         foreach (var b in data)
-        {
-            crc ^= b;
-            for (int bit = 0; bit < 8; bit++)
-                crc = (crc & 1) != 0 ? (crc >> 1) ^ 0x82F63B78u : crc >> 1;
-        }
+            crc = Crc32cTable[(crc ^ b) & 0xFF] ^ (crc >> 8);
 #else
         int i = 0;
         for (; i + 8 <= data.Length; i += 8)
@@ -242,6 +235,16 @@ public sealed class TfCheckpoint : IDisposable
 #endif
         return ~crc;
     }
+
+#if NETFRAMEWORK
+    private static readonly uint[] Crc32cTable = Enumerable.Range(0, 256).Select(i =>
+    {
+        uint c = (uint)i;
+        for (int bit = 0; bit < 8; bit++)
+            c = (c & 1) != 0 ? (c >> 1) ^ 0x82F63B78u : c >> 1;
+        return c;
+    }).ToArray();
+#endif
 
     /// <summary>LevelDB/TensorFlow checksum masking (crc32c::Mask).</summary>
     internal static uint MaskCrc(uint crc) => ((crc >> 15) | (crc << 17)) + 0xa282ead8u;

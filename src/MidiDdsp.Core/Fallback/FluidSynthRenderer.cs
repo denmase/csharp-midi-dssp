@@ -43,7 +43,7 @@ public sealed class FluidSynthRenderer
         {
             var local = new[] { AppContext.BaseDirectory, Path.Combine(AppContext.BaseDirectory, "soundfonts") }
                 .Where(Directory.Exists)
-                .SelectMany(dir => Directory.GetFiles(dir, "*.sf2").Order(StringComparer.OrdinalIgnoreCase));
+                .SelectMany(dir => Directory.GetFiles(dir, "*.sf2").OrderBy(f => f, StringComparer.OrdinalIgnoreCase));
             return local.Concat(SystemSoundFonts).ToList();
         }
     }
