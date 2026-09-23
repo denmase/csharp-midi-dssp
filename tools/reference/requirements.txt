@@ -1,0 +1,5 @@
+# Minimal environment for tools/reference scripts that only read checkpoints.
+# Python 3.9. Scripts that run the original models need more; see README.md.
+tensorflow==2.8.4
+protobuf==3.19.6
+numpy==1.23.5
